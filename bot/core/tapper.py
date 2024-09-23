@@ -181,10 +181,11 @@ class Tapper:
 
     @error_handler
     async def create_rank(self, http_client):
-        evalute = await self.make_request(http_client, "POST", "/rank/evalute")
-        if evalute and evalute.get('status', 200) != 404:
-            await self.make_request(http_client, "POST", "/rank/create")
-            return True
+        evaluate = await self.make_request(http_client, "POST", "/rank/evaluate")
+        if evaluate and evaluate.get('status', 200) != 404:
+            create_rank_resp = await self.make_request(http_client, "POST", "/rank/create")
+            if create_rank_resp.get('data', {}).get('isCreated', False) is True:
+                return True
         return False
     
     @error_handler
