@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     API_ID: int
     API_HASH: str
 
-    REF_ID: str = '00005UEJ'
-    
+    REF_ID: str = '0001DIH2'
+
     FAKE_USERAGENT: bool = True
     POINTS_COUNT: list[int] = [450, 600]
     AUTO_PLAY_GAME: bool = True
@@ -25,4 +25,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
