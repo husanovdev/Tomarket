@@ -112,6 +112,7 @@ class Tapper:
     @error_handler
     async def make_request(self, http_client, method, endpoint=None, url=None, **kwargs):
         full_url = url or f"https://api-web.tomarket.ai/tomarket-game/v1{endpoint or ''}"
+        
         response = await http_client.request(method, full_url, **kwargs)
         return await response.json()
         
@@ -351,18 +352,30 @@ class Tapper:
                 if settings.AUTO_TASK:
                     logger.info(f"{self.session_name} | Start checking tasks.")
                     tasks = await self.get_tasks(http_client=http_client)
+                    current_time = time()
                     tasks_list = []
+                    excluded_types = ['wallet', 'mysterious', 'classmate', 'classmateInvite', 'classmateInviteBack', 'charge_stars_season2', 'invite_star_group']
+                    excluded_names = ['Buy Tomatos']
+
                     if tasks and tasks.get("status", 500) == 0:
-                        for category, task_group in tasks["data"].items():
-                            for task in task_group:
-                                if task.get('enable') and not task.get('invisible', False):
+                        for category, task_group in tasks.get("data", {}).items():
+                            task_list = task_group if isinstance(task_group, list) else task_group.get("default", [])
+                            logger.info(f"{self.session_name} | Checking tasks: <r>{category}</r> ({len(task_list)} tasks)")
+                            for task in task_list:
+                                if (task.get('enable') and 
+                                    not task.get('invisible', False) and 
+                                    task.get('type', '').lower() not in excluded_types and
+                                    task.get('name') not in excluded_names):
                                     if task.get('startTime') and task.get('endTime'):
                                         task_start = convert_to_local_and_unix(task['startTime'])
                                         task_end = convert_to_local_and_unix(task['endTime'])
-                                        if task_start <= time() <= task_end:
-                                            tasks_list.append(task)
-                                    elif task.get('type') not in ['wallet', 'mysterious', 'classmate', 'classmateInvite', 'classmateInviteBack']:
+                                        if task_start <= current_time <= task_end:
+                                            if task.get('status') != 3:
+                                                tasks_list.append(task)
+                                    elif task.get('status') != 3:
                                         tasks_list.append(task)
+
+                    logger.info(f"{self.session_name} | Found {len(tasks_list)} available tasks")
                     
                     for task in tasks_list:
                         wait_second = task.get('waitSecond', 0)
