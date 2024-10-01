@@ -208,8 +208,10 @@ class Tapper:
         if self.proxy:
             await self.check_proxy(http_client=http_client)
         
+        random_user_agent = generate_random_user_agent(device_type='android', browser_type='chrome')
+        
         if settings.FAKE_USERAGENT:            
-            http_client.headers['User-Agent'] = generate_random_user_agent(device_type='android', browser_type='chrome')
+            http_client.headers['User-Agent'] = random_user_agent
 
         # ``
         # Наши переменные
@@ -230,7 +232,7 @@ class Tapper:
                     proxy_conn = ProxyConnector().from_url(self.proxy) if self.proxy else None
                     http_client = aiohttp.ClientSession(headers=headers, connector=proxy_conn)
                     if settings.FAKE_USERAGENT:            
-                        http_client.headers['User-Agent'] = generate_random_user_agent(device_type='android', browser_type='chrome')
+                        http_client.headers['User-Agent'] = random_user_agent
                 current_time = time()
                 if current_time >= token_expiration:
                     if (token_expiration != 0): # Чтобы не пугались, скрою от вас когда происходит первый запуск
