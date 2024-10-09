@@ -21,7 +21,6 @@ from bot.utils import logger
 from .agents import generate_random_user_agent
 from .headers import headers
 
-
 def error_handler(func: Callable):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
@@ -117,6 +116,7 @@ class Tapper:
     @error_handler
     async def make_request(self, http_client, method, endpoint=None, url=None, **kwargs):
         full_url = url or f"https://api-web.tomarket.ai/tomarket-game/v1{endpoint or ''}"
+
         response = await http_client.request(method, full_url, **kwargs)
         return await response.json()
 
@@ -217,9 +217,11 @@ class Tapper:
         http_client = aiohttp.ClientSession(headers=headers, connector=proxy_conn)
         if self.proxy:
             await self.check_proxy(http_client=http_client)
+        
+        random_user_agent = generate_random_user_agent(device_type='android', browser_type='chrome')
 
         if settings.FAKE_USERAGENT:
-            http_client.headers['User-Agent'] = generate_random_user_agent(device_type='android', browser_type='chrome')
+            http_client.headers['User-Agent'] = random_user_agent
 
         # ``
         # Наши переменные
@@ -239,9 +241,8 @@ class Tapper:
 
                     proxy_conn = ProxyConnector().from_url(self.proxy) if self.proxy else None
                     http_client = aiohttp.ClientSession(headers=headers, connector=proxy_conn)
-                    if settings.FAKE_USERAGENT:
-                        http_client.headers['User-Agent'] = generate_random_user_agent(device_type='android',
-                                                                                       browser_type='chrome')
+                    if settings.FAKE_USERAGENT:            
+                        http_client.headers['User-Agent'] = random_user_agent
                 current_time = time()
                 if current_time >= token_expiration:
                     if (token_expiration != 0):  # Чтобы не пугались, скрою от вас когда происходит первый запуск
@@ -377,19 +378,30 @@ class Tapper:
                 if settings.AUTO_TASK:
                     logger.info(f"{self.session_name} | Start checking tasks.")
                     tasks = await self.get_tasks(http_client=http_client)
+                    current_time = time()
                     tasks_list = []
+                    excluded_types = ['wallet', 'mysterious', 'classmate', 'classmateInvite', 'classmateInviteBack', 'charge_stars_season2', 'invite_star_group']
+                    excluded_names = ['Buy Tomatos']
+
                     if tasks and tasks.get("status", 500) == 0:
-                        for category, task_group in tasks["data"].items():
-                            for task in task_group:
-                                if task.get('enable') and not task.get('invisible', False):
+                        for category, task_group in tasks.get("data", {}).items():
+                            task_list = task_group if isinstance(task_group, list) else task_group.get("default", [])
+                            logger.info(f"{self.session_name} | Checking tasks: <r>{category}</r> ({len(task_list)} tasks)")
+                            for task in task_list:
+                                if (task.get('enable') and
+                                    not task.get('invisible', False) and
+                                    task.get('type', '').lower() not in excluded_types and
+                                    task.get('name') not in excluded_names):
                                     if task.get('startTime') and task.get('endTime'):
                                         task_start = convert_to_local_and_unix(task['startTime'])
                                         task_end = convert_to_local_and_unix(task['endTime'])
-                                        if task_start <= time() <= task_end:
-                                            tasks_list.append(task)
-                                    elif task.get('type') not in ['wallet', 'mysterious', 'classmate',
-                                                                  'classmateInvite', 'classmateInviteBack']:
+                                        if task_start <= current_time <= task_end:
+                                            if task.get('status') != 3:
+                                                tasks_list.append(task)
+                                    elif task.get('status') != 3:
                                         tasks_list.append(task)
+
+                    logger.info(f"{self.session_name} | Found {len(tasks_list)} available tasks")
 
                     for task in tasks_list:
                         wait_second = task.get('waitSecond', 0)
